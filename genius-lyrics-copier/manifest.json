@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Genius Lyrics Copier",
+  "version": "1.0",
+  "description": "Copies song lyrics from Genius.com to your clipboard.",
+  "permissions": [
+    "scripting",
+    "clipboardWrite",
+    "declarativeContent"
+  ],
+  "host_permissions": [
+    "*://*.genius.com/*"
+  ],
+  "action": {
+    "default_icon": {
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "128": "icons/icon128.png"
+  }
+}
