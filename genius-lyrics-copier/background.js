@@ -1,19 +1,63 @@
-const CHARS_TO_REPLACE = {
+const REPLACE_QUOTES = {
     "‘": "'", "’": "'", "‚": "'", "ʼ": "'", "`": "'", "‹": "'", "›": "'",
-    "„": "\"", "“": "\"", "”": "\"", "«": "\"", "»": "\"",
-    "—": "-", "–": "-", "‐": "-", "−": "-",
-    "…": "...",
-    " ": " ", " ": " ", " ": " ", "　": " ",
-    "е": "e",
+    "„": "\"", "“": "\"", "”": "\"", "«": "\"", "»": "\""
 };
+const REPLACE_DASHES = {
+    "—": "-", "–": "-", "‐": "-", "−": "-"
+};
+const REPLACE_SPACES = {
+    " ": " ", " ": " ", " ": " ", "　": " ", " ": ""
+};
+const REPLACE_OTHER = {
+    "…": "...",
+    "е": "e"
+};
+
+let userSettings = {
+    replaceQuotes: true,
+    replaceDashes: false,
+    replaceSpaces: true,
+    replaceOther: true
+};
+
+function loadSettings() {
+    chrome.storage.sync.get(
+        {
+            replaceQuotes: true,
+            replaceDashes: false,
+            replaceSpaces: true,
+            replaceOther: true
+        },
+        (items) => {
+            userSettings = items;
+        }
+    );
+}
+
+loadSettings();
+
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync') {
+        for (let key in changes) {
+            userSettings[key] = changes[key].newValue;
+        }
+    }
+});
 
 function getCleanedText(s) {
     if (!s || typeof s !== 'string') return "";
     let text = s;
-    for (const charToReplace in CHARS_TO_REPLACE) {
+
+    let activeReplacements = {};
+    if (userSettings.replaceQuotes) Object.assign(activeReplacements, REPLACE_QUOTES);
+    if (userSettings.replaceDashes) Object.assign(activeReplacements, REPLACE_DASHES);
+    if (userSettings.replaceSpaces) Object.assign(activeReplacements, REPLACE_SPACES);
+    if (userSettings.replaceOther) Object.assign(activeReplacements, REPLACE_OTHER);
+
+    for (const charToReplace in activeReplacements) {
         if (text.includes(charToReplace)) {
             const escapedKey = charToReplace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            text = text.replace(new RegExp(escapedKey, 'g'), CHARS_TO_REPLACE[charToReplace]);
+            text = text.replace(new RegExp(escapedKey, 'g'), activeReplacements[charToReplace]);
         }
     }
     return text.trim();

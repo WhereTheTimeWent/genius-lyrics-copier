@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Genius Lyrics Copier Settings</title>
+  <style>
+    body {
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-width: 300px;
+    }
+    h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    .option-group {
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #eee;
+      border-radius: 5px;
+    }
+    .option-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      cursor: pointer;
+    }
+    .help-text {
+      font-size: 0.85em;
+      color: #666;
+      margin-left: 23px;
+    }
+    button {
+      background-color: #4CAF50; /* Green */
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .status {
+      margin-left: 10px;
+      color: #4CAF50;
+      font-size: 0.9em;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .status.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Settings</h2>
+
+  <div class="option-group">
+    <label>
+      <input type="checkbox" id="replaceQuotes">
+      Replace Quotes
+    </label>
+    <div class="help-text">Replaces smart quotes ( ‘ ’ ‚ “ ” « » ) with plain quotes ( ' " ).</div>
+  </div>
+
+  <div class="option-group">
+    <label>
+      <input type="checkbox" id="replaceDashes">
+      Replace Dashes
+    </label>
+    <div class="help-text">Replaces various dashes ( — – ) with standard hyphens ( - ).</div>
+  </div>
+
+  <div class="option-group">
+    <label>
+      <input type="checkbox" id="replaceSpaces">
+      Replace Spaces
+    </label>
+    <div class="help-text">Replaces special spaces (non-breaking, etc.) with standard spaces.</div>
+  </div>
+
+  <div class="option-group">
+    <label>
+      <input type="checkbox" id="replaceOther">
+      Replace Other Characters
+    </label>
+    <div class="help-text">Replaces other characters like ellipsis ( … ) and cyrillic 'e'.</div>
+  </div>
+
+  <button id="save">Save</button>
+  <button id="reset" style="background-color: #f44336; margin-left: 10px;">Reset to Defaults</button>
+  <span id="status" class="status">Options saved.</span>
+
+  <script src="options.js"></script>
+</body>
+</html>
