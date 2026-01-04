@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Genius Lyrics Copier",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Copies song lyrics from Genius.com to your clipboard.",
   "permissions": [
     "scripting",

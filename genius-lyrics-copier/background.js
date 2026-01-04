@@ -1,19 +1,22 @@
-const _CharsToReplace = {
-    "’": "'", "‚": "'", "„": "\"", "“": "\"", "”": "\"", "е": "e", "—": "-",
+const CHARS_TO_REPLACE = {
+    "‘": "'", "’": "'", "‚": "'", "ʼ": "'", "`": "'", "‹": "'", "›": "'",
+    "„": "\"", "“": "\"", "”": "\"", "«": "\"", "»": "\"",
+    "—": "-", "–": "-", "‐": "-", "−": "-",
+    "…": "...",
+    " ": " ", " ": " ", " ": " ", "　": " ",
+    "е": "e",
 };
 
 function getCleanedText(s) {
-    if (!s || typeof s !== 'string') return { Text: "", HasReplaced: false };
-    let hasReplaced = false;
+    if (!s || typeof s !== 'string') return "";
     let text = s;
-    for (const charToReplace in _CharsToReplace) {
+    for (const charToReplace in CHARS_TO_REPLACE) {
         if (text.includes(charToReplace)) {
             const escapedKey = charToReplace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            text = text.replace(new RegExp(escapedKey, 'g'), _CharsToReplace[charToReplace]);
-            hasReplaced = true;
+            text = text.replace(new RegExp(escapedKey, 'g'), CHARS_TO_REPLACE[charToReplace]);
         }
     }
-    return { Text: text.trim(), HasReplaced: hasReplaced };
+    return text.trim();
 }
 
 function scrapeLyricsFromPage() {
@@ -24,21 +27,29 @@ function scrapeLyricsFromPage() {
     const exclusionSelector = '[data-exclude-from-selection="true"]';
     const finalQuerySelector = mainSelectors.map(sel => `${sel}:not(${exclusionSelector})`).join(', ');
     const lyricsContainers = document.querySelectorAll(finalQuerySelector);
+
+    function getTextWithLineBreaks(element) {
+        let result = '';
+        element.childNodes.forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                result += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.matches && node.matches(exclusionSelector)) return;
+                if (node.tagName === 'BR') {
+                    result += '\n';
+                } else if (node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') {
+                    result += getTextWithLineBreaks(node);
+                }
+            }
+        });
+        return result;
+    }
+
     if (lyricsContainers && lyricsContainers.length > 0) {
         let lyricsBuilder = "";
         lyricsContainers.forEach(cont => {
-            let currentText = "";
-            cont.childNodes.forEach(node => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    currentText += node.textContent;
-                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.matches && node.matches(exclusionSelector)) return;
-                    if (node.tagName === 'BR') currentText += '\n';
-                    else if (node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') currentText += node.innerText || "";
-                }
-            });
-            const trimmedCurrentText = currentText.trim();
-            if (trimmedCurrentText) lyricsBuilder += trimmedCurrentText + '\n\n';
+            const currentText = getTextWithLineBreaks(cont).trim();
+            if (currentText) lyricsBuilder += currentText + '\n\n';
         });
         return lyricsBuilder.trim();
     }
@@ -48,99 +59,129 @@ function scrapeLyricsFromPage() {
 function copyTextToClipboardOnPageContext(textToCopy) {
     return navigator.clipboard.writeText(textToCopy)
         .then(() => true)
-        .catch(err => {
-            console.error('Page context: Error copying to clipboard:', err);
-            return false;
-        });
+        .catch(() => false);
 }
 
-
 async function showSuccessFeedback(tabId) {
-  console.log(`[SuccessBadge] Showing success badge for tab ${tabId}`);
-  chrome.action.setBadgeText({ text: "✓", tabId: tabId });
-  chrome.action.setBadgeBackgroundColor({ color: "#4CAF50", tabId: tabId });
+    try {
+        await chrome.action.setBadgeText({ text: "✓", tabId: tabId });
+        await chrome.action.setBadgeBackgroundColor({ color: "#4CAF50", tabId: tabId });
 
-  setTimeout(() => {
-    chrome.action.setBadgeText({ text: "", tabId: tabId });
-  }, 2000);
+        setTimeout(() => {
+            chrome.action.setBadgeText({ text: "", tabId: tabId }).catch(() => {});
+        }, 2000);
+    } catch (e) {
+    }
 }
 
 async function showErrorPopup(tabId, errorMessage) {
-  console.log(`[Popup] Showing error popup for tab ${tabId} with message: "${errorMessage}"`);
-  const popupUrl = `error.html?message=${encodeURIComponent(errorMessage)}`;
-  
-  try {
-    await chrome.action.setPopup({ tabId: tabId, popup: popupUrl });
-    await chrome.action.openPopup();
-  } catch (e) {
-    console.error("[Popup] Error setting or opening error popup:", e);
-  }
+    const popupUrl = `error.html?message=${encodeURIComponent(errorMessage)}`;
+    try {
+        await chrome.action.setPopup({ tabId: tabId, popup: popupUrl });
+        await chrome.action.openPopup();
+    } catch (e) {
+    }
+}
+
+function copyTextToClipboardOnPageContext(textToCopy) {
+    try {
+        return navigator.clipboard.writeText(textToCopy)
+            .then(() => { return { success: true }; })
+            .catch(err => {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+
+                textArea.focus();
+                textArea.select();
+
+                return new Promise((resolve, reject) => {
+                    let success = false;
+                    try {
+                        success = document.execCommand('copy');
+                    } catch (e) {
+                    }
+                    document.body.removeChild(textArea);
+
+                    if (success) {
+                        resolve({ success: true });
+                    } else {
+                        resolve({ success: false, error: "Both writeText and execCommand failed." });
+                    }
+                });
+            });
+    } catch (e) {
+         return { success: false, error: e.message };
+    }
+}
+
+async function runGeniusCopyFlow(tabId, tabUrl) {
+    if (!tabUrl || !tabUrl.toLowerCase().includes("genius.com/")) {
+        await showErrorPopup(tabId, "This extension only works on Genius.com song lyrics pages.");
+        return;
+    }
+
+    try {
+        await chrome.action.setPopup({ tabId: tabId, popup: "" });
+        await chrome.action.setBadgeText({ text: "", tabId: tabId });
+    } catch (e) { }
+
+    let scrapeResults;
+    try {
+        scrapeResults = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            function: scrapeLyricsFromPage
+        });
+    } catch (e) {
+        if (e.message && e.message.includes("No tab with id")) throw e;
+
+        await showErrorPopup(tabId, `An unexpected error occurred: ${e.message}`);
+        return;
+    }
+
+    if (scrapeResults && scrapeResults[0] && typeof scrapeResults[0].result === 'string') {
+        let rawLyrics = scrapeResults[0].result;
+
+        if (rawLyrics.length > 0) {
+            const lyricsToCopy = getCleanedText(rawLyrics);
+
+            const copyResults = await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                function: copyTextToClipboardOnPageContext,
+                args: [lyricsToCopy]
+            });
+
+            if (copyResults && copyResults[0] && copyResults[0].result && copyResults[0].result.success === true) {
+                await showSuccessFeedback(tabId);
+            } else {
+                await showErrorPopup(tabId, "Lyrics could not be copied. Browser blocked clipboard access.");
+            }
+        } else {
+            await showErrorPopup(tabId, "No lyrics found on this page.");
+        }
+    } else {
+        await showErrorPopup(tabId, "Lyrics could not be extracted from the page.");
+    }
 }
 
 chrome.action.onClicked.addListener(async (tab) => {
-    console.log('[Action] Icon clicked. Tab URL:', tab.url);
-
     try {
-        await chrome.action.setPopup({ tabId: tab.id, popup: "" });
-        await chrome.action.setBadgeText({ text: "", tabId: tab.id });
+        await runGeniusCopyFlow(tab.id, tab.url);
     } catch (e) {
-        console.warn("[Action] Error resetting popup/badge (ignored):", e);
-    }
-
-    if (tab.url && tab.url.toLowerCase().includes("genius.com/")) {
-        console.log('[Action] URL is a Genius.com URL.');
-        try {
-            console.log('[Action] Attempting to scrape lyrics...');
-            const scrapeResults = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                function: scrapeLyricsFromPage
-            });
-            console.log('[Action] Scrape result:', scrapeResults);
-
-            if (scrapeResults && scrapeResults[0] && typeof scrapeResults[0].result === 'string') {
-                let rawLyrics = scrapeResults[0].result;
-                console.log('[Action] Raw lyrics found, length:', rawLyrics.length);
-                
-                if (rawLyrics.length > 0) {
-                    const cleanedResult = getCleanedText(rawLyrics);
-                    const lyricsToCopy = cleanedResult.Text;
-                    console.log('[Action] Lyrics cleaned. Attempting to copy to clipboard...');
-
-                    const copyResults = await chrome.scripting.executeScript({
-                        target: { tabId: tab.id },
-                        function: copyTextToClipboardOnPageContext,
-                        args: [lyricsToCopy]
-                    });
-                    console.log('[Action] Copy attempt result:', copyResults);
-
-                    if (copyResults && copyResults[0] && copyResults[0].result === true) {
-                        console.log('[Action] Successfully copied to clipboard.');
-                        await showSuccessFeedback(tab.id);
-                    } else {
-                        console.error('[Action] Error copying to clipboard.');
-                        await showErrorPopup(tab.id, "Lyrics could not be copied to the clipboard. (Content script error)");
-                        if (copyResults && copyResults[0] && copyResults[0].error) {
-                             console.error("[Action] Content script copy error:", copyResults[0].error);
-                        }
-                    }
-                } else {
-                    console.log('[Action] No raw lyrics found on the page (empty string).');
-                    await showErrorPopup(tab.id, "No lyrics found on this page.");
+        if (e.message && e.message.includes("No tab with id")) {
+            try {
+                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tabs && tabs.length > 0) {
+                    const activeTab = tabs[0];
+                    await runGeniusCopyFlow(activeTab.id, activeTab.url);
                 }
-            } else {
-                console.error('[Action] Could not extract lyrics.');
-                await showErrorPopup(tab.id, "Lyrics could not be extracted from the page.");
-                if (scrapeResults && scrapeResults[0] && scrapeResults[0].error) {
-                     console.error("[Action] Injection error (scraping):", scrapeResults[0].error);
-                }
+            } catch (retryError) {
             }
-        } catch (e) {
-            console.error("[Action] Unexpected error in action handler:", e);
-            await showErrorPopup(tab.id, `An unexpected error occurred: ${e.message}`);
         }
-    } else {
-        console.log('[Action] URL is NOT a Genius.com URL.');
-        await showErrorPopup(tab.id, "This extension only works on Genius.com song lyrics pages.");
     }
 });
 
